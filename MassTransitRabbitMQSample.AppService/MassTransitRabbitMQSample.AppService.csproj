@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+	  <PackageReference Include="Aoxe.SequentialGuid" Version="2025.1.2" />
+	  <PackageReference Include="MassTransit.RabbitMQ" Version="8.3.6" />
+	  <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.1" />
+	  <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="7.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MassTransitRabbitMQSample.Message\MassTransitRabbitMQSample.Message.csproj" />
+  </ItemGroup>
+
+</Project>
