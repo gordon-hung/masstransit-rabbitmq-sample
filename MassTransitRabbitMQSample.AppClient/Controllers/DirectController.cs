@@ -4,9 +4,10 @@ using MassTransitRabbitMQSample.Message.Models;
 using Microsoft.AspNetCore.Mvc;
 
 namespace MassTransitRabbitMQSample.AppClient.Controllers;
+
 [Route("api/[controller]")]
 [ApiController]
-public class MessageController : ControllerBase
+public class DirectController : ControllerBase
 {
 	[HttpPost("Normal")]
 	public Task NormalMessagePublish(

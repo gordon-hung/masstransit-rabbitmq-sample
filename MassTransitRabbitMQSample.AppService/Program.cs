@@ -1,10 +1,11 @@
-﻿using MassTransit;
+﻿using System.Net.Mime;
+using System.Text.Json.Serialization;
+
+using MassTransit;
 using MassTransitRabbitMQSample.AppService.MessageHeaders;
 using MassTransitRabbitMQSample.Message.Models;
 using Microsoft.AspNetCore.Mvc;
 using RabbitMQ.Client;
-using System.Net.Mime;
-using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -35,12 +36,16 @@ builder.Services.AddMassTransit((IBusRegistrationConfigurator registrationConfig
 	{
 		configurator.Host(new Uri(builder.Configuration.GetConnectionString("RabbitMQ")!));
 
+		var directExchangeName = string.Concat(builder.Environment.EnvironmentName, ".", "Sample", ".", "Direct");
 		var normalMessageQueueName = string.Concat(builder.Environment.EnvironmentName, ".", "Sample", ".", nameof(NormalMessage));
 		configurator.ReceiveEndpoint(
 			queueName: normalMessageQueueName,
 			configureEndpoint: (IRabbitMqReceiveEndpointConfigurator endpointConfigurator) =>
 			{
 				endpointConfigurator.ExchangeType = ExchangeType.Direct;
+				endpointConfigurator.Bind(
+					exchangeName: directExchangeName,
+					c => c.ExchangeType = ExchangeType.Direct);
 				endpointConfigurator.Consumer<NormalMessageHeader>(context);
 			});
 
@@ -50,6 +55,9 @@ builder.Services.AddMassTransit((IBusRegistrationConfigurator registrationConfig
 			configureEndpoint: (IRabbitMqReceiveEndpointConfigurator endpointConfigurator) =>
 			{
 				endpointConfigurator.ExchangeType = ExchangeType.Direct;
+				endpointConfigurator.Bind(
+					exchangeName: directExchangeName,
+					c => c.ExchangeType = ExchangeType.Direct);
 				endpointConfigurator.Consumer<FailMessageHeader>(context);
 			});
 
@@ -59,6 +67,9 @@ builder.Services.AddMassTransit((IBusRegistrationConfigurator registrationConfig
 			configureEndpoint: (IRabbitMqReceiveEndpointConfigurator endpointConfigurator) =>
 			{
 				endpointConfigurator.ExchangeType = ExchangeType.Direct;
+				endpointConfigurator.Bind(
+					exchangeName: directExchangeName,
+					c => c.ExchangeType = ExchangeType.Direct);
 				endpointConfigurator.Consumer<FailFixeMessageHeader>(context);
 			});
 
@@ -68,6 +79,9 @@ builder.Services.AddMassTransit((IBusRegistrationConfigurator registrationConfig
 			configureEndpoint: (IRabbitMqReceiveEndpointConfigurator endpointConfigurator) =>
 			{
 				endpointConfigurator.ExchangeType = ExchangeType.Direct;
+				endpointConfigurator.Bind(
+					exchangeName: directExchangeName,
+					c => c.ExchangeType = ExchangeType.Direct);
 				endpointConfigurator.UseMessageRetry(r => r.Incremental(3, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5)));
 				endpointConfigurator.Consumer<FaultMessageHeader>(context);
 				endpointConfigurator.Consumer<FaultConsumerMessageHeader>(context);
@@ -80,15 +94,29 @@ builder.Services.AddMassTransit((IBusRegistrationConfigurator registrationConfig
 			configureEndpoint: (IRabbitMqReceiveEndpointConfigurator endpointConfigurator) =>
 			{
 				endpointConfigurator.ExchangeType = ExchangeType.Direct;
+				endpointConfigurator.Bind(
+					exchangeName: directExchangeName,
+					c => c.ExchangeType = ExchangeType.Direct);
 				endpointConfigurator.UseMessageRetry(r => r.Incremental(3, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5)));
 				endpointConfigurator.Consumer<DiscardFaultedMessageHeader>(context);
 				endpointConfigurator.DiscardFaultedMessages();
 			});
-
 	});
 });
 
 builder.Services.AddSingleton(TimeProvider.System);
+
+builder.Services
+	.AddSingleton(sp =>
+	{
+		var factory = new ConnectionFactory
+		{
+			Uri = new Uri(builder.Configuration.GetConnectionString("RabbitMQ")!),
+		};
+		return factory.CreateConnectionAsync().GetAwaiter().GetResult();
+	})
+	.AddHealthChecks()
+	.AddRabbitMQ();
 
 var app = builder.Build();
 
@@ -98,7 +126,6 @@ if (app.Environment.IsDevelopment())
 	app.MapOpenApi();
 
 	_ = app.UseSwaggerUI(options => options.SwaggerEndpoint("/openapi/v1.json", "OpenAPI V1"));
-
 }
 
 app.UseHttpsRedirection();
@@ -106,5 +133,7 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
+
+app.MapHealthChecks("/healthz");
 
 app.Run();

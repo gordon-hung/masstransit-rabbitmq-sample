@@ -16,6 +16,5 @@ public class FailMessageHeader(
 		});
 
 		throw new NotImplementedException();
-
 	}
 }

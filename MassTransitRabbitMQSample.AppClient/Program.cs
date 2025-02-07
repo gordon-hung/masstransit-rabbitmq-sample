@@ -1,9 +1,12 @@
-﻿using MassTransit;
+﻿using System.Net.Mime;
+using System.Text.Json.Serialization;
+
+using MassTransit;
 using MassTransitRabbitMQSample.Message.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
-using System.Net.Mime;
-using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -41,10 +44,21 @@ builder.Services.AddMassTransit((IBusRegistrationConfigurator registrationConfig
 		var discardFaultedMessageQueueName = string.Concat(builder.Environment.EnvironmentName, ".", "Sample", ".", nameof(DiscardFaultedMessage));
 		configurator.Message<DiscardFaultedMessage>(c => c.SetEntityName(discardFaultedMessageQueueName));
 		configurator.Publish<DiscardFaultedMessage>(c => c.ExchangeType = ExchangeType.Direct);
-
 	}));
 
 builder.Services.AddSingleton(TimeProvider.System);
+
+builder.Services
+	.AddSingleton(sp =>
+	{
+		var factory = new ConnectionFactory
+		{
+			Uri = new Uri(builder.Configuration.GetConnectionString("RabbitMQ")!),
+		};
+		return factory.CreateConnectionAsync().GetAwaiter().GetResult();
+	})
+	.AddHealthChecks()
+	.AddRabbitMQ();
 
 var app = builder.Build();
 
@@ -54,7 +68,6 @@ if (app.Environment.IsDevelopment())
 	app.MapOpenApi();
 
 	_ = app.UseSwaggerUI(options => options.SwaggerEndpoint("/openapi/v1.json", "OpenAPI V1"));
-
 }
 
 app.UseHttpsRedirection();
@@ -62,5 +75,7 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
+
+app.MapHealthChecks("/healthz");
 
 app.Run();

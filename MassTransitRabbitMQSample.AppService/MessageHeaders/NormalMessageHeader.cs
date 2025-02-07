@@ -16,6 +16,5 @@ public class NormalMessageHeader(
 		});
 
 		return Task.CompletedTask;
-
 	}
 }
