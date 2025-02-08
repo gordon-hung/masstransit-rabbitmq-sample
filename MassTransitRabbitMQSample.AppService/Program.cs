@@ -6,6 +6,7 @@ using MassTransit.Logging;
 using MassTransit.Monitoring;
 using MassTransitRabbitMQSample.AppService.MessageHeaders;
 using MassTransitRabbitMQSample.Message.Models;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using OpenTelemetry;
@@ -175,6 +176,14 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-app.MapHealthChecks("/healthz");
+app.MapHealthChecks("/live", new HealthCheckOptions
+{
+	Predicate = check => check.Tags.Contains("live")
+});
+
+app.MapHealthChecks("/healthz", new HealthCheckOptions
+{
+	Predicate = _ => true
+});
 
 app.Run();
