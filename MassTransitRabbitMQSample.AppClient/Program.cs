@@ -66,7 +66,7 @@ builder.Services.AddOpenTelemetry()
 		.AddMeter("MassTransitRabbitMQSample.")
 		.AddMeter(InstrumentationOptions.MeterName)
 		.AddPrometheusExporter()
-		.AddConsoleExporter()
+		//.AddConsoleExporter()
 		.AddRuntimeInstrumentation()
 		.AddAspNetCoreInstrumentation())
 	.WithTracing(tracing => tracing
@@ -84,8 +84,7 @@ builder.Services.AddOpenTelemetry()
 				!httpContext.Request.Path.Value!.Equals("/api/events/raw", StringComparison.OrdinalIgnoreCase) &&
 				!httpContext.Request.Path.Value!.EndsWith(".js", StringComparison.OrdinalIgnoreCase) &&
 				!httpContext.Request.Path.StartsWithSegments("/_vs", StringComparison.OrdinalIgnoreCase)))
-	.WithLogging(logging => logging
-		.AddConsoleExporter());
+	.WithLogging();
 
 builder.Services
 	.AddSingleton(sp =>
