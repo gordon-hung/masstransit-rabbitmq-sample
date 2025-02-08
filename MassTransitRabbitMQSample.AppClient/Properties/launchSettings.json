@@ -8,7 +8,9 @@
       "launchUrl": "swagger",
       "applicationUrl": "http://localhost:5188",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "OTLP_ENDPOINT_URL": "http://127.0.0.1:4317/",
+        "SERVICE_NAME": "masstransit-rabbitmq-sample-appclien(local)"
       }
     },
     "https": {
@@ -18,7 +20,9 @@
       "launchUrl": "swagger",
       "applicationUrl": "https://localhost:7029;http://localhost:5188",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "OTLP_ENDPOINT_URL": "http://127.0.0.1:4317/",
+        "SERVICE_NAME": "masstransit-rabbitmq-sample-appclien(local)"
       }
     }
   }

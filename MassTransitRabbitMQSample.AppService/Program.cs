@@ -2,9 +2,18 @@
 using System.Text.Json.Serialization;
 
 using MassTransit;
+using MassTransit.Logging;
+using MassTransit.Monitoring;
 using MassTransitRabbitMQSample.AppService.MessageHeaders;
 using MassTransitRabbitMQSample.Message.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using OpenTelemetry;
+using OpenTelemetry.Exporter;
+using OpenTelemetry.Logs;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using RabbitMQ.Client;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -106,6 +115,37 @@ builder.Services.AddMassTransit((IBusRegistrationConfigurator registrationConfig
 
 builder.Services.AddSingleton(TimeProvider.System);
 
+builder.Services.AddOpenTelemetry()
+	.ConfigureResource(resource => resource
+	.AddService(builder.Configuration["SERVICE_NAME"]!))
+	.UseOtlpExporter(OtlpExportProtocol.Grpc, new Uri(builder.Configuration["OTLP_ENDPOINT_URL"]!))
+	.WithMetrics(metrics => metrics
+		//.SetResourceBuilder(ResourceBuilder.CreateDefault()
+		//.AddEnvironmentVariableDetector())
+		.AddMeter("MassTransitRabbitMQSample.")
+		.AddMeter(InstrumentationOptions.MeterName)
+		.AddPrometheusExporter()
+		.AddConsoleExporter()
+		.AddRuntimeInstrumentation()
+		.AddAspNetCoreInstrumentation())
+	.WithTracing(tracing => tracing
+		 //.SetResourceBuilder(ResourceBuilder.CreateDefault()
+		 //.AddEnvironmentVariableDetector())
+		 .AddSource(DiagnosticHeaders.DefaultListenerName)
+		.AddHttpClientInstrumentation()
+		.AddGrpcClientInstrumentation()
+		.AddGrpcCoreInstrumentation()
+		.AddEntityFrameworkCoreInstrumentation(options => options.SetDbStatementForText = true)
+		.AddAspNetCoreInstrumentation(options => options.Filter = (httpContext) =>
+				!httpContext.Request.Path.StartsWithSegments("/openapi", StringComparison.OrdinalIgnoreCase) &&
+				!httpContext.Request.Path.StartsWithSegments("/swagger", StringComparison.OrdinalIgnoreCase) &&
+				!httpContext.Request.Path.StartsWithSegments("/healthz", StringComparison.OrdinalIgnoreCase) &&
+				!httpContext.Request.Path.Value!.Equals("/api/events/raw", StringComparison.OrdinalIgnoreCase) &&
+				!httpContext.Request.Path.Value!.EndsWith(".js", StringComparison.OrdinalIgnoreCase) &&
+				!httpContext.Request.Path.StartsWithSegments("/_vs", StringComparison.OrdinalIgnoreCase)))
+	.WithLogging(logging => logging
+		.AddConsoleExporter());
+
 builder.Services
 	.AddSingleton(sp =>
 	{
@@ -116,6 +156,7 @@ builder.Services
 		return factory.CreateConnectionAsync().GetAwaiter().GetResult();
 	})
 	.AddHealthChecks()
+	.AddCheck("self", () => HealthCheckResult.Healthy(), ["live"])
 	.AddRabbitMQ();
 
 var app = builder.Build();
