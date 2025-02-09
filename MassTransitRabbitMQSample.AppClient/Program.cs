@@ -58,7 +58,10 @@ builder.Services.AddSingleton(TimeProvider.System);
 
 builder.Services.AddOpenTelemetry()
 	.ConfigureResource(resource => resource
-	.AddService(builder.Configuration["SERVICE_NAME"]!))
+		.AddService(
+			builder.Configuration["SERVICE_NAME"]!,
+			serviceInstanceId: Environment.MachineName)
+	)
 	.UseOtlpExporter(OtlpExportProtocol.Grpc, new Uri(builder.Configuration["OTLP_ENDPOINT_URL"]!))
 	.WithMetrics(metrics => metrics
 		//.SetResourceBuilder(ResourceBuilder.CreateDefault()
