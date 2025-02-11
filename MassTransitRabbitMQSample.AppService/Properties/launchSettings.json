@@ -10,6 +10,7 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "OTLP_ENDPOINT_URL": "http://127.0.0.1:4317/",
+        "FLUENT_ENDPOINT_URL": "http://127.0.0.1:24224/",
         "SERVICE_NAME": "masstransit-rabbitmq-sample-appservice(local)"
       }
     },
@@ -22,6 +23,7 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "OTLP_ENDPOINT_URL": "http://127.0.0.1:4317/",
+        "FLUENT_ENDPOINT_URL": "http://127.0.0.1:24224/",
         "SERVICE_NAME": "masstransit-rabbitmq-sample-appservice(local)"
       }
     }

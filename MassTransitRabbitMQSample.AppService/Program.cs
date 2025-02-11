@@ -9,8 +9,6 @@ using MassTransitRabbitMQSample.Message.Models;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using OpenTelemetry;
-using OpenTelemetry.Exporter;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -44,7 +42,12 @@ builder.Services.AddMassTransit((IBusRegistrationConfigurator registrationConfig
 
 	registrationConfigurator.UsingRabbitMq((IBusRegistrationContext context, IRabbitMqBusFactoryConfigurator configurator) =>
 	{
-		configurator.Host(new Uri(builder.Configuration.GetConnectionString("RabbitMQ")!));
+		configurator.Host(builder.Configuration.GetValue<string>("RabbitMQ:HostName")!,
+			factory =>
+			{
+				factory.Username(builder.Configuration.GetValue<string>("RabbitMQ:UserName")!);
+				factory.Password(builder.Configuration.GetValue<string>("RabbitMQ:Password")!);
+			});
 
 		var directExchangeName = string.Concat(builder.Environment.EnvironmentName, ".", "Sample", ".", "Direct");
 		var normalMessageQueueName = string.Concat(builder.Environment.EnvironmentName, ".", "Sample", ".", nameof(NormalMessage));
@@ -119,13 +122,14 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddOpenTelemetry()
 	.ConfigureResource(resource => resource
 		.AddService(
-				builder.Configuration["SERVICE_NAME"]!,
-				serviceInstanceId: Environment.MachineName)
+			builder.Configuration["SERVICE_NAME"]!,
+			serviceInstanceId: Environment.MachineName)
 	)
-	.UseOtlpExporter(OtlpExportProtocol.Grpc, new Uri(builder.Configuration["OTLP_ENDPOINT_URL"]!))
+	//.UseOtlpExporter(OtlpExportProtocol.Grpc, new Uri(builder.Configuration["OTLP_ENDPOINT_URL"]!))
 	.WithMetrics(metrics => metrics
 		//.SetResourceBuilder(ResourceBuilder.CreateDefault()
 		//.AddEnvironmentVariableDetector())
+		.AddOtlpExporter(options => options.Endpoint = new Uri(builder.Configuration["OTLP_ENDPOINT_URL"]!))
 		.AddMeter("MassTransitRabbitMQSample.")
 		.AddMeter(InstrumentationOptions.MeterName)
 		.AddPrometheusExporter()
@@ -133,9 +137,10 @@ builder.Services.AddOpenTelemetry()
 		.AddRuntimeInstrumentation()
 		.AddAspNetCoreInstrumentation())
 	.WithTracing(tracing => tracing
-		 //.SetResourceBuilder(ResourceBuilder.CreateDefault()
-		 //.AddEnvironmentVariableDetector())
-		 .AddSource(DiagnosticHeaders.DefaultListenerName)
+		//.SetResourceBuilder(ResourceBuilder.CreateDefault()
+		//.AddEnvironmentVariableDetector())
+		.AddOtlpExporter(options => options.Endpoint = new Uri(builder.Configuration["OTLP_ENDPOINT_URL"]!))
+		.AddSource(DiagnosticHeaders.DefaultListenerName)
 		.AddHttpClientInstrumentation()
 		.AddGrpcClientInstrumentation()
 		.AddGrpcCoreInstrumentation()
@@ -147,20 +152,23 @@ builder.Services.AddOpenTelemetry()
 				!httpContext.Request.Path.Value!.Equals("/api/events/raw", StringComparison.OrdinalIgnoreCase) &&
 				!httpContext.Request.Path.Value!.EndsWith(".js", StringComparison.OrdinalIgnoreCase) &&
 				!httpContext.Request.Path.StartsWithSegments("/_vs", StringComparison.OrdinalIgnoreCase)))
-	.WithLogging();
+	.WithLogging(logging => logging
+	.AddOtlpExporter(options => options.Endpoint = new Uri(builder.Configuration["FLUENT_ENDPOINT_URL"]!)));
 
 builder.Services
-	.AddSingleton(sp =>
+	.AddHealthChecks()
+	.AddCheck("self", () => HealthCheckResult.Healthy(), ["live"])
+	.AddRabbitMQ(sp =>
 	{
 		var factory = new ConnectionFactory
 		{
-			Uri = new Uri(builder.Configuration.GetConnectionString("RabbitMQ")!),
+			HostName = builder.Configuration.GetValue<string>("RabbitMQ:HostName")!,
+			UserName = builder.Configuration.GetValue<string>("RabbitMQ:UserName")!,
+			Password = builder.Configuration.GetValue<string>("RabbitMQ:Password")!
+			//Uri = new Uri(builder.Configuration.GetConnectionString("RabbitMQ")!),
 		};
-		return factory.CreateConnectionAsync().GetAwaiter().GetResult();
-	})
-	.AddHealthChecks()
-	.AddCheck("self", () => HealthCheckResult.Healthy(), ["live"])
-	.AddRabbitMQ();
+		return factory.CreateConnectionAsync();
+	});
 
 var app = builder.Build();
 
@@ -180,12 +188,24 @@ app.MapControllers();
 
 app.MapHealthChecks("/live", new HealthCheckOptions
 {
-	Predicate = check => check.Tags.Contains("live")
+	Predicate = check => check.Tags.Contains("live"),
+	ResultStatusCodes =
+	{
+		[HealthStatus.Healthy] = StatusCodes.Status200OK,
+		[HealthStatus.Degraded] = StatusCodes.Status200OK,
+		[HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable
+	}
 });
 
 app.MapHealthChecks("/healthz", new HealthCheckOptions
 {
-	Predicate = _ => true
+	Predicate = _ => true,
+	ResultStatusCodes =
+	{
+		[HealthStatus.Healthy] = StatusCodes.Status200OK,
+		[HealthStatus.Degraded] = StatusCodes.Status200OK,
+		[HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable
+	}
 });
 
 app.Run();
